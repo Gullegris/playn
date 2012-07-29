@@ -45,6 +45,8 @@ public abstract class GameActivity extends Activity {
   private GameViewGL gameView;
   private AndroidLayoutView viewLayout;
   private Context context;
+  
+  private boolean initialized = false;
 
   /**
    * The entry-point into a PlayN game. Developers should implement main() to call
@@ -57,55 +59,63 @@ public abstract class GameActivity extends Activity {
     super.onCreate(savedInstanceState);
 
     context = getApplicationContext();
-
-    // Build the AndroidPlatform and register this activity.
-    AndroidGL20 gl20;
-    if (isHoneycombOrLater() || !AndroidGL20Native.available) {
-      gl20 = new AndroidGL20();
-    } else {
-      // Provide our own native bindings for some missing methods.
-      gl20 = new AndroidGL20Native();
-    }
-
-    // Build a View to hold the surface view and report changes to the screen
-    // size.
-    viewLayout = new AndroidLayoutView(this);
-    gameView = new GameViewGL(gl20, this, context);
-    viewLayout.addView(gameView);
-
-    // Build the Window and View
-    if (isHoneycombOrLater()) {
-      // Use the raw constant rather than the flag to avoid blowing up on
-      // earlier Android
-      int flagHardwareAccelerated = 0x1000000;
-      getWindow().setFlags(flagHardwareAccelerated, flagHardwareAccelerated);
-    }
-
-    getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-        WindowManager.LayoutParams.FLAG_FULLSCREEN);
-    LayoutParams params = new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT);
-    getWindow().setContentView(viewLayout, params);
-
-    // Default to landscape orientation.
-    if (usePortraitOrientation()) {
-      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-    } else {
-      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-    }
-
-    // Make sure the AndroidManifest.xml is set up correctly.
-    try {
-      ActivityInfo info = this.getPackageManager().getActivityInfo(
-          new ComponentName(context, this.getPackageName() + "." + this.getLocalClassName()), 0);
-      if ((info.configChanges & REQUIRED_CONFIG_CHANGES) != REQUIRED_CONFIG_CHANGES) {
-        new AlertDialog.Builder(this).setMessage(
-            "Unable to guarantee application will handle configuration changes. "
-                + "Please add the following line to the Activity manifest: "
-                + "      android:configChanges=\"keyboardHidden|orientation\"").show();
+    
+    init();
+  }
+  
+  protected void init() {
+    if (!initialized) {
+      // Build the AndroidPlatform and register this activity.
+      AndroidGL20 gl20;
+      if (isHoneycombOrLater() || !AndroidGL20Native.available) {
+        gl20 = new AndroidGL20();
+      } else {
+        // Provide our own native bindings for some missing methods.
+        gl20 = new AndroidGL20Native();
       }
-    } catch (NameNotFoundException e) {
-      Log.w("playn", "Cannot access game AndroidManifest.xml file.");
+  
+      // Build a View to hold the surface view and report changes to the screen
+      // size.
+      viewLayout = new AndroidLayoutView(this);
+      gameView = new GameViewGL(gl20, this, context);
+      viewLayout.addView(gameView);
+  
+      // Build the Window and View
+      if (isHoneycombOrLater()) {
+        // Use the raw constant rather than the flag to avoid blowing up on
+        // earlier Android
+        int flagHardwareAccelerated = 0x1000000;
+        getWindow().setFlags(flagHardwareAccelerated, flagHardwareAccelerated);
+      }
+  
+      getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+          WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      LayoutParams params = new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT);
+      getWindow().setContentView(viewLayout, params);
+  
+      // Default to landscape orientation.
+      if (usePortraitOrientation()) {
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+      } else {
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+      }
+  
+      // Make sure the AndroidManifest.xml is set up correctly.
+      try {
+        ActivityInfo info = this.getPackageManager().getActivityInfo(
+            new ComponentName(context, this.getPackageName() + "." + this.getLocalClassName()), 0);
+        if ((info.configChanges & REQUIRED_CONFIG_CHANGES) != REQUIRED_CONFIG_CHANGES) {
+          new AlertDialog.Builder(this).setMessage(
+              "Unable to guarantee application will handle configuration changes. "
+                  + "Please add the following line to the Activity manifest: "
+                  + "      android:configChanges=\"keyboardHidden|orientation\"").show();
+        }
+      } catch (NameNotFoundException e) {
+        Log.w("playn", "Cannot access game AndroidManifest.xml file.");
+      }
     }
+    
+    initialized = true;
   }
 
   /**
@@ -153,6 +163,8 @@ public abstract class GameActivity extends Activity {
 
   @Override
   protected void onPause() {
+    initialized = false;
+    
     if (AndroidPlatform.DEBUG_LOGS) Log.d("playn", "onPause");
     gameView.notifyVisibilityChanged(View.INVISIBLE);
     if (platform() != null)
@@ -162,6 +174,8 @@ public abstract class GameActivity extends Activity {
 
   @Override
   protected void onResume() {
+    init();
+    
     if (AndroidPlatform.DEBUG_LOGS) Log.d("playn", "onResume");
     gameView.notifyVisibilityChanged(View.VISIBLE);
     if (platform() != null)
